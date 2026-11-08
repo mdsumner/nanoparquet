@@ -8,6 +8,18 @@
 using namespace nanoparquet;
 using namespace std;
 
+// Parses the footer and nothing else. RParquetReader's constructor runs
+// init(), which allocates every result column at the file's num_rows (and
+// conversion buffers) for a full read; the metadata and schema functions
+// need only file_meta_data_.
+class MetadataReader : public ParquetReader {
+public:
+  MetadataReader(std::string filename) : ParquetReader(filename) { }
+  void alloc_column_chunk(ColumnChunk &cc) { }
+  void alloc_dict_page(DictPage &dict) { }
+  void alloc_data_page(DataPage &data) { }
+};
+
 extern "C" {
 
 extern SEXP nanoparquet_call;
@@ -407,7 +419,7 @@ SEXP nanoparquet_read_metadata(SEXP filesxp) {
   R_API_START(R_NilValue);
 
   const char *fname = CHAR(STRING_ELT(filesxp, 0));
-  RParquetReader f(fname);
+  MetadataReader f(fname);
 
   const char *res_nms[] = {
     "file_meta_data",
@@ -459,7 +471,7 @@ SEXP nanoparquet_read_schema(SEXP filesxp) {
   R_API_START(R_NilValue);
   SEXP cfname = PROTECT(STRING_ELT(filesxp, 0));
   const char *fname = CHAR(cfname);
-  RParquetReader f(fname);
+  MetadataReader f(fname);
   parquet::FileMetaData fmd = f.file_meta_data_;
   UNPROTECT(1);
   return convert_schema(fname, fmd.schema);
